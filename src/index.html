@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Real-time Pastebin</title>
+    <style>
+        body { max-width: 800px; margin: 20px auto; padding: 0 20px; }
+        textarea { 
+            width: 100%; 
+            height: 400px; 
+            padding: 10px;
+            font-family: monospace;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            resize: vertical;
+        }
+    </style>
+</head>
+<body>
+    <textarea id="content" placeholder="Start typing..."></textarea>
+    <script>
+        const textarea = document.getElementById('content');
+        let saveTimeout;
+        let isLocalUpdate = true;
+
+        // 初始化加载
+        fetch('/content')
+            .then(r => r.text())
+            .then(text => textarea.value = text);
+
+        // 建立SSE连接
+        const eventSource = new EventSource('/updates');
+        eventSource.onmessage = (e) => {
+            if (e.data !== textarea.value) {
+                isLocalUpdate = false;
+                textarea.value = e.data;
+                setTimeout(() => isLocalUpdate = true, 100);
+            }
+        };
+
+        // 输入处理
+        textarea.addEventListener('input', () => {
+            if (!isLocalUpdate) return;
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                fetch('/content', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: textarea.value })
+                });
+            }, 500);
+        });
+    </script>
+</body>
+</html>
